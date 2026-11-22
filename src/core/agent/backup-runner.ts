@@ -6,6 +6,7 @@ import { TempWorkspace } from '../git/temp-workspace.js';
 import { buildSnapshot, checkForChanges, type PreviousSnapshot } from '../git/snapshot-engine.js';
 import { uploadStagedJob } from './snapshot-uploader.js';
 import { AgentLock, AlreadyRunningError } from './lock.js';
+import { buildFinalHeartbeat, reportToHq } from './hq-reporter.js';
 import { discoverTargets } from '../discovery.js';
 import { downloadVerified } from '../cloud/download-manager.js';
 import { ReauthRequiredError } from '../cloud/oauth.js';
@@ -236,6 +237,8 @@ export async function runBackupAgent(ctx: RuntimeContext, opts: AgentRunOptions)
   }
 
   writeStatus(ctx, { state: 'running', job_id: jobId, trigger: opts.trigger, started_at: started, current: null });
+  // 실제 백업을 하는 실행만 HQ에 보고한다(이미 완료된 날의 보충 실행·중복 실행은 제외)
+  if (summary.status !== 'skipped') await reportToHq(ctx, { kind: 'start', payload: { runId: jobId, source: 'repovault', stage: 'started', startedAt: started, message: `백업 시작 (${opts.trigger})` } });
   try {
     const git = new GitEngine({ auth: opts.gitAuthOverride });
     try {
@@ -322,6 +325,7 @@ export async function runBackupAgent(ctx: RuntimeContext, opts: AgentRunOptions)
     }
     writeStatus(ctx, { state: 'idle', last_job: summary });
     lock.release();
+    await reportToHq(ctx, buildFinalHeartbeat(summary));
   }
   return summary;
 }

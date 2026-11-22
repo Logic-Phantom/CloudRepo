@@ -41,6 +41,7 @@ Google Cloud Console 설정은 [docs/GOOGLE_DRIVE_SETUP.md](docs/GOOGLE_DRIVE_SE
 | `repos add <url>` / `repos exclude <id>` | 수동 Remote 등록 / 백업 제외 |
 | `schedule install \| uninstall \| status` | 자동 백업 |
 | `pending list` | 아직 Drive에 올라가지 않은 임시 데이터 |
+| `hq set --url <HQ> \| status \| test \| clear` | AutoMateHQ에 백업 결과 보고(Heartbeat 키는 stdin → Keychain) |
 | `migrate-legacy <path>` | 기존 로컬 bare 백업 → Drive 이전 |
 
 ## 문서
@@ -97,3 +98,8 @@ npm test
 - **CLI**: setup / auth / github / repos / backup / history / restore / verify / drive / schedule / pending / migrate-legacy / status
 - 테스트 42개 작성·통과, 문서 6종 작성
 - 실제 GitHub 계정에서 private 포함 저장소 36개 탐색 및 private 저장소 인증 fetch 확인
+
+### 2026-11-22 — AutoMateHQ 백업 결과 보고
+- 백업 에이전트가 실행 시작·결과를 AutoMateHQ Heartbeat로 보고(`src/core/agent/hq-reporter.ts`). 설정이 없으면 아무것도 보내지 않고, HQ 전송 실패는 백업 결과에 영향 없음
+- 판정: 전부 백업/변경 없음 → complete. 실패·업로드 대기 → fail(`BACKUP_PARTIAL`·`UPLOAD_PENDING`), 작업 실패 → fail(`BACKUP_FAILED`·`DRIVE_REAUTH`). 원격에서 사라진 저장소는 실패로 보지 않음. 이미 완료된 날의 보충 실행·중복 실행은 보고 안 함
+- `hq set|status|test|clear` CLI, 키는 OS 자격증명 저장소(`hq-heartbeat-secret`)에만 저장. 테스트 4개 추가(총 46개 통과)

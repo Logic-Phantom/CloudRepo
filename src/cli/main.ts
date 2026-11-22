@@ -15,6 +15,7 @@ import { TempWorkspace } from '../core/git/temp-workspace.js';
 import { formatBytes } from '../core/utils/misc.js';
 import { sanitizeError } from '../core/utils/sanitize.js';
 import { APP_VERSION } from '../core/types.js';
+import { loadHqSettings, sendHeartbeat } from '../core/agent/hq-reporter.js';
 
 type Flags = Record<string, string | boolean | string[]>;
 
@@ -70,6 +71,8 @@ const HELP = `RepoVault ${APP_VERSION} — Git 저장소를 Google Drive에 백�
 Drive / 스케줄 / 기타
   drive status | resync | rebuild | select-root <folderId>
   schedule install [--time 03:00] | uninstall | status
+  hq set --url <https://HQ 주소> [--project-key cloudrepo]   (Heartbeat 키는 stdin)
+  hq status | test | clear             AutoMateHQ 백업 결과 보고
   migrate-legacy <path> [--dry-run]
   status [--json]
 `;
@@ -184,6 +187,9 @@ async function main() {
         break;
       case 'schedule':
         await cmdSchedule(ctx, sub, flags);
+        break;
+      case 'hq':
+        await cmdHq(ctx, sub, flags);
         break;
       case 'migrate-legacy': {
         if (!sub) throw new Error('사용법: migrate-legacy <path>');
@@ -309,6 +315,45 @@ async function cmdAuth(ctx: RuntimeContext, sub: string | undefined, flags: Flag
     return;
   }
   throw new Error('사용법: auth login | status | logout [--revoke]');
+}
+
+async function cmdHq(ctx: RuntimeContext, sub: string | undefined, flags: Flags) {
+  if (sub === 'set') {
+    const url = str(flags, 'url') ?? ctx.cfg.hq.url;
+    if (!url || !/^https:\/\//.test(url)) throw new Error('사용법: echo <Heartbeat 키> | repovault hq set --url https://<HQ 주소> [--project-key cloudrepo]');
+    const projectKey = str(flags, 'project-key') ?? ctx.cfg.hq.project_key;
+    if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(projectKey)) throw new Error('project-key 형식이 아닙니다(영문 소문자·숫자·하이픈).');
+    const secret = process.stdin.isTTY ? '' : await readStdin();
+    if (secret) await ctx.creds.set(CredentialKeys.hqHeartbeatSecret, secret);
+    else if (!(await ctx.creds.get(CredentialKeys.hqHeartbeatSecret))) throw new Error('Heartbeat 키를 stdin으로 전달하세요. (HQ 프로젝트 상세 → Heartbeat 키 발급)');
+    ctx.configStore.update((c) => {
+      c.hq = { url: url.replace(/\/+$/, ''), project_key: projectKey };
+    });
+    console.log(`HQ 보고 설정 완료: ${url} (${projectKey})${secret ? ' — 키는 OS 자격증명 저장소에 저장' : ''}. \`repovault hq test\`로 확인하세요.`);
+    return;
+  }
+  if (sub === 'clear') {
+    await ctx.creds.delete(CredentialKeys.hqHeartbeatSecret);
+    ctx.configStore.update((c) => {
+      c.hq = { url: null, project_key: c.hq.project_key };
+    });
+    console.log('HQ 보고를 껐습니다(키 삭제).');
+    return;
+  }
+  const settings = await loadHqSettings(ctx);
+  if (sub === 'test') {
+    if (!settings) throw new Error('HQ 보고가 설정되지 않았습니다. `repovault hq set` 먼저 실행하세요.');
+    const runId = `rv-test-${Date.now()}`;
+    const now = new Date().toISOString();
+    const r = await sendHeartbeat(settings, {
+      kind: 'complete',
+      payload: { runId, source: 'repovault', status: 'skipped', stage: 'test', startedAt: now, completedAt: now, message: '연결 테스트 (repovault hq test) — 백업 아님' },
+    });
+    console.log(r.ok ? `✅ HQ 수신 확인 (${r.status}) — 대시보드에 '건너뜀' 실행 1건(연결 테스트)이 보입니다.` : `❌ 전송 실패 ${r.status ?? ''} ${r.error ?? ''}`);
+    if (!r.ok) process.exitCode = 1;
+    return;
+  }
+  console.log(settings ? `HQ 보고: 켜짐 — ${settings.url} (${settings.projectKey})` : `HQ 보고: 꺼짐${ctx.cfg.hq.url ? ' (키 없음)' : ''}`);
 }
 
 async function cmdGithub(ctx: RuntimeContext, sub: string | undefined) {

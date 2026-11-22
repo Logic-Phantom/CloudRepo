@@ -9,6 +9,7 @@ export const CredentialKeys = {
   googleClientSecret: 'google-client-secret',
   githubToken: 'github-token',
   gitlabToken: 'gitlab-token',
+  hqHeartbeatSecret: 'hq-heartbeat-secret',
   uploadSession: (id: string) => `upload-session:${id}`,
 } as const;
 

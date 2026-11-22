@@ -55,6 +55,11 @@ export interface AppConfig {
     chunk_size_mb: number;
   };
   temp_dir_override: string | null;
+  /** AutoMateHQ Heartbeat 보고(선택). secret은 Credential Store(hq-heartbeat-secret)에 저장 */
+  hq: {
+    url: string | null;
+    project_key: string;
+  };
   retention: {
     /** 기본값: 무기한 보관. 자동 삭제는 사용자가 명시적으로 켜야 한다. */
     auto_delete_enabled: boolean;
@@ -87,6 +92,7 @@ export function defaultConfig(): AppConfig {
     retry: { max_attempts: 5 },
     upload: { chunk_size_mb: 8 },
     temp_dir_override: null,
+    hq: { url: null, project_key: 'cloudrepo' },
     retention: { auto_delete_enabled: false, keep_days: null },
   };
 }
