@@ -63,7 +63,7 @@ docs/  scripts/
 ```bash
 npm test
 ```
-실제 Google 계정 없이 **Mock Google Drive v3 HTTP 서버**와 임시 bare 저장소로 검증합니다 (현재 **42개 통과**).
+실제 Google 계정 없이 **Mock Google Drive v3 HTTP 서버**와 임시 bare 저장소로 검증합니다 (현재 **46개 통과**).
 
 | 영역 | 검증 시나리오 |
 |---|---|
@@ -103,3 +103,11 @@ npm test
 - 백업 에이전트가 실행 시작·결과를 AutoMateHQ Heartbeat로 보고(`src/core/agent/hq-reporter.ts`). 설정이 없으면 아무것도 보내지 않고, HQ 전송 실패는 백업 결과에 영향 없음
 - 판정: 전부 백업/변경 없음 → complete. 실패·업로드 대기 → fail(`BACKUP_PARTIAL`·`UPLOAD_PENDING`), 작업 실패 → fail(`BACKUP_FAILED`·`DRIVE_REAUTH`). 원격에서 사라진 저장소는 실패로 보지 않음. 이미 완료된 날의 보충 실행·중복 실행은 보고 안 함
 - `hq set|status|test|clear` CLI, 키는 OS 자격증명 저장소(`hq-heartbeat-secret`)에만 저장. 테스트 4개 추가(총 46개 통과)
+
+### 2026-11-22 — 실제 Google Drive 연동 및 운영 시작
+- Google Cloud 프로젝트 `RepoVault` 생성, Drive API 활성화, OAuth 동의 화면(외부) 구성 및 **프로덕션 게시**(Refresh Token 7일 만료 방지), Desktop OAuth Client 발급
+- 개인정보처리방침 [docs/PRIVACY.md](docs/PRIVACY.md) 추가 (동의 화면 게시 요건)
+- Google 계정 연결 → `My Drive/Git` 폴더 구조 자동 생성
+- **첫 전체 백업: GitHub 저장소 36개(private 포함) 모두 Drive 스냅샷 생성 성공, 실패·업로드 대기 0건, 로컬 임시 데이터 0** (Drive 사용 약 2.3 GB)
+- 실제 Drive에서 private 저장소(`chiply`)를 내려받아 복원 검증 통과 (`verify`)
+- macOS LaunchAgent 등록: 매일 03:00 자동 백업 + 로그인 시 누락분 보충
