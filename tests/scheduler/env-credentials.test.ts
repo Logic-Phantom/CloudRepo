@@ -26,3 +26,14 @@ describe('Git 인증 헤더 (CI 회귀)', () => {
     expect(pairs[idx + 1]![1]).toMatch(/^Authorization: Basic /);
   });
 });
+
+describe('GitHub 토큰 Contents 권한 진단', () => {
+  it('commits API 403/404 → 권한 없음, 200/409(빈 저장소) → 권한 있음', async () => {
+    const { GitHubAdapter } = await import('../../src/core/providers/github.js');
+    const make = (status: number) => new GitHubAdapter('t', { apiBase: 'https://api.test', fetchImpl: (async () => new Response('[]', { status })) as typeof fetch });
+    expect(await make(403).checkContentsAccess('o', 'r')).toBe(false);
+    expect(await make(404).checkContentsAccess('o', 'r')).toBe(false);
+    expect(await make(200).checkContentsAccess('o', 'r')).toBe(true);
+    expect(await make(409).checkContentsAccess('o', 'r')).toBe(true);
+  });
+});

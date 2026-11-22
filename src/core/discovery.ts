@@ -36,10 +36,13 @@ export async function discoverTargets(ctx: RuntimeContext): Promise<DiscoveryRes
       errors.push('GitHub 토큰을 찾을 수 없습니다. `repovault github login` 또는 `gh auth login`으로 인증해 주세요.');
     } else {
       github.tokenSource = tok.source;
-      auth.push(githubGitAuth(tok.token));
+      const gitAuth = githubGitAuth(tok.token);
+      auth.push(gitAuth);
       try {
         const gh = new GitHubAdapter(tok.token);
         github.login = (await gh.currentUser()).login;
+        // fine-grained 토큰 호환: Basic 인증 사용자명으로 실제 GitHub 로그인 사용
+        gitAuth.username = github.login;
         const list = await gh.listRepositories({
           includeOrgs: cfg.github.include_orgs,
           includeCollaborator: cfg.github.include_collaborator_repos,
@@ -47,6 +50,16 @@ export async function discoverTargets(ctx: RuntimeContext): Promise<DiscoveryRes
           includeForks: cfg.github.include_forks,
         });
         for (const t of list) byId.set(t.id, t);
+        // 목록 조회(Metadata 권한)는 되지만 코드 읽기(Contents 권한)가 없으면 git fetch가 전부 실패하므로 미리 진단
+        const probe = list.find((t) => t.private) ?? list[0];
+        if (probe) {
+          const access = await gh.checkContentsAccess(probe.owner, probe.name);
+          if (!access) {
+            errors.push(
+              'GitHub 토큰에 저장소 코드 읽기 권한이 없습니다. fine-grained 토큰이면 Repository permissions → Contents: Read-only 를 추가하세요 (Metadata만으로는 목록 조회만 가능).',
+            );
+          }
+        }
         okProviders.add('github');
         github.ok = true;
       } catch (e) {

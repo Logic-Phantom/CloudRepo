@@ -261,6 +261,8 @@ export async function runBackupAgent(ctx: RuntimeContext, opts: AgentRunOptions)
     if (summary.status !== 'skipped') {
       const disc = await discoverTargets(ctx);
       for (const err of disc.errors) ctx.log.warn(err);
+      // 저장소 이름이 없는 진단 메시지는 요약에 포함해 공개 CI 로그에서도 원인을 알 수 있게 한다
+      if (disc.errors.length) summary.message = disc.errors.join(" / ");
       const gitWithAuth = new GitEngine({ auth: opts.gitAuthOverride ?? disc.auth });
       for (const m of disc.missing) {
         ctx.log.warn('원격 목록에서 저장소가 사라졌습니다 — Drive 백업은 그대로 유지합니다.', { repo: m.id });

@@ -107,6 +107,17 @@ export class GitHubAdapter {
     return res;
   }
 
+  /** 코드 읽기(Contents) 권한 확인. 403/404면 false, 그 외 오류는 판단 보류(true) */
+  async checkContentsAccess(owner: string, name: string): Promise<boolean> {
+    try {
+      await this.get(`${this.apiBase}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commits?per_page=1`);
+      return true;
+    } catch (e) {
+      if (e instanceof ProviderAuthError) return false;
+      return !/오류 (403|404)$/.test((e as Error).message) || /오류 409$/.test((e as Error).message);
+    }
+  }
+
   async currentUser(): Promise<{ login: string; scopes: string[] }> {
     const res = await this.get(`${this.apiBase}/user`);
     const body = (await res.json()) as { login: string };
