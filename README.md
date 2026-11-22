@@ -120,3 +120,7 @@ npm test
 - 환경 변수 자격 증명(`REPOVAULT_CREDENTIAL_BACKEND=env`), 공개 로그에 private 저장소 이름 미출력, 실패 시 워크플로 실패(메일 알림)
 - `scripts/setup-cloud-backup.mjs`: Keychain 값을 암호화해 Actions Secrets 등록 (값 미출력)
 - 로컬에서 빈 환경 + 환경 변수만으로 실제 Drive 백업 시뮬레이션 성공 (36개 확인, 실패 0). 테스트 47개 통과
+- 수정: GitHub Actions에서 checkout 토큰과 RepoVault 토큰의 Authorization 헤더 중복으로 git이 HTTP 400 → 기존 헤더 초기화 + 중립 cwd + `persist-credentials: false`
+- 수정: 백업용 토큰 사전 검증(유효성·Contents 읽기 권한)을 등록 스크립트와 에이전트에 추가
+- 백업 전용 fine-grained 토큰(모든 저장소, Contents/Metadata 읽기 전용) 발급·등록
+- **GitHub Actions 실제 실행 성공**: 대상 36 / 새 스냅샷 1 / 변경 없음 35 / 실패 0 — PC 전원과 무관하게 매일 03:30 KST 백업 동작 확인. 테스트 49개 통과
