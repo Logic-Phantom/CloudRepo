@@ -15,3 +15,14 @@ describe('클라우드 러너용 환경 변수 자격 증명', () => {
     expect(await s.get('upload-session:job:file')).toBeNull();
   });
 });
+
+describe('Git 인증 헤더 (CI 회귀)', () => {
+  it('토큰 헤더 앞에 빈 extraHeader로 기존 헤더(checkout 토큰 등)를 초기화해 중복 Authorization(400)을 막는다', async () => {
+    const { GitEngine } = await import('../../src/core/git/git-engine.js');
+    const env = new GitEngine({ auth: [{ urlPrefix: 'https://github.com/', username: 'x-access-token', token: 't' }] }).env();
+    const pairs = Array.from({ length: Number(env.GIT_CONFIG_COUNT) }, (_, i) => [env[`GIT_CONFIG_KEY_${i}`], env[`GIT_CONFIG_VALUE_${i}`]]);
+    const idx = pairs.findIndex(([k]) => k === 'http.https://github.com/.extraHeader');
+    expect(pairs[idx]![1]).toBe('');
+    expect(pairs[idx + 1]![1]).toMatch(/^Authorization: Basic /);
+  });
+});

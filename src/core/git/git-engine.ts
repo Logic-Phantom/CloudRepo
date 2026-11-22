@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import { CommandError, run, type ExecResult } from '../utils/exec.js';
 import type { RefMap } from '../types.js';
 
@@ -70,6 +71,8 @@ export class GitEngine {
     ];
     for (const a of this.auth) {
       const basic = Buffer.from(`${a.username}:${a.token}`).toString('base64');
+      // 빈 값으로 기존 extraHeader 목록을 초기화한다 (CI checkout 등이 남긴 Authorization 헤더와 중복되면 GitHub이 400을 반환)
+      entries.push([`http.${a.urlPrefix}.extraHeader`, '']);
       entries.push([`http.${a.urlPrefix}.extraHeader`, `Authorization: Basic ${basic}`]);
     }
     env.GIT_CONFIG_COUNT = String(entries.length);
@@ -82,7 +85,8 @@ export class GitEngine {
 
   async exec(args: string[], opts: { cwd?: string; allowFailure?: boolean; input?: string; timeoutMs?: number } = {}): Promise<ExecResult> {
     return run(this.git, args, {
-      cwd: opts.cwd,
+      // cwd 미지정 시 중립 디렉터리에서 실행 → 현재 폴더가 다른 Git 저장소여도 그 로컬 설정(인증 헤더 등)을 물려받지 않음
+      cwd: opts.cwd ?? tmpdir(),
       env: this.env(),
       allowFailure: opts.allowFailure,
       input: opts.input,

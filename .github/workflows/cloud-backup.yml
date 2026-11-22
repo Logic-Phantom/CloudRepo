@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false # RepoVault가 자체 인증 헤더를 쓰므로 checkout 토큰을 git 설정에 남기지 않음
 
       - uses: actions/setup-node@v4
         with:
