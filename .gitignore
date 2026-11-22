@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+# 로컬 런타임 데이터(재생성 가능한 캐시) — 절대 커밋하지 않음
+.repovault-dev/
