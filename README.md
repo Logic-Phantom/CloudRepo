@@ -113,3 +113,10 @@ npm test
 - **첫 전체 백업: GitHub 저장소 36개(private 포함) 모두 Drive 스냅샷 생성 성공, 실패·업로드 대기 0건, 로컬 임시 데이터 0** (Drive 사용 약 2.3 GB)
 - 실제 Drive에서 private 저장소(`chiply`)를 내려받아 복원 검증 통과 (`verify`)
 - macOS LaunchAgent 등록: 매일 03:00 자동 백업 + 로그인 시 누락분 보충
+
+### 2026-11-22 — PC가 꺼져 있어도 백업 (클라우드 러너)
+- 검토: OS 스케줄러는 PC가 켜져야 동작, `pmset` 깨우기는 전원 꺼짐 불가 → **GitHub Actions 예약 워크플로** 채택 (공개 저장소 무료, GitHub 서버에서 실행)
+- `.github/workflows/cloud-backup.yml`: 매일 03:30 KST, Drive 기준 변경 감지라 PC 백업과 중복 스냅샷 없음, LFS 포함, 60일 비활성화 방지 keepalive
+- 환경 변수 자격 증명(`REPOVAULT_CREDENTIAL_BACKEND=env`), 공개 로그에 private 저장소 이름 미출력, 실패 시 워크플로 실패(메일 알림)
+- `scripts/setup-cloud-backup.mjs`: Keychain 값을 암호화해 Actions Secrets 등록 (값 미출력)
+- 로컬에서 빈 환경 + 환경 변수만으로 실제 Drive 백업 시뮬레이션 성공 (36개 확인, 실패 0). 테스트 47개 통과
