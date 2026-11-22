@@ -176,7 +176,33 @@ export class FileCredentialStore implements CredentialStore {
   }
 }
 
+/**
+ * 클라우드 러너(GitHub Actions 등)용: 비밀값을 환경 변수(CI Secrets)에서 읽는다.
+ * 키 `google-refresh-token` → `REPOVAULT_SECRET_GOOGLE_REFRESH_TOKEN`.
+ * 쓰기(업로드 세션 등)는 프로세스 메모리에만 보관하고 디스크에 남기지 않는다.
+ */
+export class EnvCredentialStore implements CredentialStore {
+  readonly kind = 'env';
+  private readonly mem = new Map<string, string>();
+  constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
+  static varName(key: string) {
+    return `REPOVAULT_SECRET_${key.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
+  }
+  async get(key: string) {
+    if (this.mem.has(key)) return this.mem.get(key)!;
+    const v = this.env[EnvCredentialStore.varName(key)];
+    return v && v.trim() ? v.trim() : null;
+  }
+  async set(key: string, value: string) {
+    this.mem.set(key, value);
+  }
+  async delete(key: string) {
+    this.mem.delete(key);
+  }
+}
+
 export function createCredentialStore(fallbackFile: string, platform = process.platform): CredentialStore {
+  if (process.env.REPOVAULT_CREDENTIAL_BACKEND === 'env') return new EnvCredentialStore();
   if (process.env.REPOVAULT_CREDENTIAL_BACKEND === 'file') return new FileCredentialStore(fallbackFile);
   if (platform === 'darwin') return new MacKeychainStore();
   if (platform === 'win32') return new WindowsCredentialStore();

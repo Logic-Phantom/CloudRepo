@@ -50,6 +50,15 @@ export class RuntimeContext {
     mkdirSync(this.paths.workDir, { recursive: true });
     this.configStore = new ConfigStore(this.paths.configFile);
     this.cfg = this.configStore.load();
+    // 클라우드 러너(PC가 꺼져 있어도 동작하는 GitHub Actions 등)용 환경 변수 설정
+    const env = process.env;
+    if (env.REPOVAULT_GOOGLE_CLIENT_ID || env.REPOVAULT_DEVICE_ID || env.REPOVAULT_ROOT_FOLDER_NAME) {
+      this.cfg = this.configStore.update((c) => {
+        if (env.REPOVAULT_GOOGLE_CLIENT_ID) c.google.client_id = env.REPOVAULT_GOOGLE_CLIENT_ID.trim();
+        if (env.REPOVAULT_DEVICE_ID) c.device_id = env.REPOVAULT_DEVICE_ID.trim();
+        if (env.REPOVAULT_ROOT_FOLDER_NAME) c.google.root_folder_name = env.REPOVAULT_ROOT_FOLDER_NAME.trim();
+      });
+    }
     this.cache = new CacheDb(this.paths.cacheDb);
     this.creds = opts.creds ?? createCredentialStore(join(this.paths.dataDir, 'credentials.json'));
     this.retryBaseMs = opts.retryBaseMs ?? 1000;

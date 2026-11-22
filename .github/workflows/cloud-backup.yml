@@ -1,0 +1,74 @@
+# RepoVault 클라우드 백업 — PC가 꺼져 있어도 GitHub 서버에서 매일 실행
+# 필요한 Secrets 등록: node scripts/setup-cloud-backup.mjs  (docs/CLOUD_RUNNER.md 참고)
+name: RepoVault Cloud Backup
+
+on:
+  schedule:
+    - cron: '30 18 * * *' # 매일 03:30 KST (UTC 18:30) — PC 예약(03:00) 직후. PC가 이미 백업했으면 '변경 없음'으로 끝남
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write # 60일 무활동 시 예약 워크플로 자동 비활성화 방지(keepalive)
+
+concurrency:
+  group: repovault-cloud-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    # 포크된 저장소에서는 실행하지 않음 (Secrets도 전달되지 않음)
+    if: github.repository == 'Logic-Phantom/CloudRepo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Git LFS 준비
+        run: |
+          git lfs version || (sudo apt-get update -qq && sudo apt-get install -y -qq git-lfs)
+          git lfs install --skip-repo
+
+      - name: 의존성 설치·빌드 (Electron 바이너리 제외)
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc -p tsconfig.json
+
+      - name: Secrets 확인
+        env:
+          A: ${{ secrets.REPOVAULT_GOOGLE_CLIENT_ID }}
+          B: ${{ secrets.REPOVAULT_GOOGLE_REFRESH_TOKEN }}
+          C: ${{ secrets.REPOVAULT_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$A" ] || [ -z "$B" ] || [ -z "$C" ]; then
+            echo "::error::RepoVault Secrets가 없습니다. PC에서 'node scripts/setup-cloud-backup.mjs' 를 실행해 등록하세요."
+            exit 1
+          fi
+
+      - name: Google Drive로 백업
+        env:
+          REPOVAULT_HOME: ${{ runner.temp }}/repovault
+          REPOVAULT_CREDENTIAL_BACKEND: env
+          REPOVAULT_DEVICE_ID: github-actions
+          REPOVAULT_GOOGLE_CLIENT_ID: ${{ secrets.REPOVAULT_GOOGLE_CLIENT_ID }}
+          REPOVAULT_SECRET_GOOGLE_CLIENT_SECRET: ${{ secrets.REPOVAULT_GOOGLE_CLIENT_SECRET }}
+          REPOVAULT_SECRET_GOOGLE_REFRESH_TOKEN: ${{ secrets.REPOVAULT_GOOGLE_REFRESH_TOKEN }}
+          REPOVAULT_SECRET_GITHUB_TOKEN: ${{ secrets.REPOVAULT_GITHUB_TOKEN }}
+          # 공개 저장소의 Actions 로그에 private 저장소 이름이 나오지 않도록 요약 숫자만 출력 (상세 로그는 Drive Git/logs/)
+          REPOVAULT_QUIET: '1'
+          REPOVAULT_PUBLIC_LOG: '1'
+          REPOVAULT_MIN_FREE_BYTES: '1073741824'
+        run: node dist/cli/main.js --run-backup-agent --trigger cloud
+
+      - name: 예약 워크플로 유지 (60일 무활동 비활성화 방지)
+        if: always() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/cloud-backup.yml/enable" || true

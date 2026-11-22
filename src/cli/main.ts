@@ -82,13 +82,16 @@ async function main() {
   const { positional, flags } = parseArgs(argv);
   if (flags['run-backup-agent']) {
     const ctx = new RuntimeContext();
-    const trigger = (str(flags, 'trigger') ?? 'schedule') as AgentRunOptions['trigger'];
+    const rawTrigger = str(flags, 'trigger') ?? 'schedule';
+    // cloud: GitHub Actions 등 PC 밖 러너. 매 실행이 새 환경이므로 "오늘 이미 완료" 판정 없이 항상 Drive 기준 변경 감지
+    const trigger = (rawTrigger === 'cloud' ? 'cli' : rawTrigger) as AgentRunOptions['trigger'];
     const effective = trigger === 'schedule' ? 'catch-up' : trigger;
     // 예약 실행은 '오늘 이미 완료됐는지' 판정을 공유한다 (launchd RunAtLoad / 로그온 트리거 대응)
     const summary = await runBackupAgent(ctx, { trigger: effective === 'catch-up' && isNearScheduled(ctx) ? 'schedule' : effective });
     printSummary(summary);
     ctx.close();
-    process.exitCode = summary.status === 'failed' ? 1 : 0;
+    const strict = rawTrigger === 'cloud' && (summary.failed_count > 0 || summary.pending_count > 0);
+    process.exitCode = summary.status === 'failed' || strict ? 1 : 0;
     return;
   }
   const [cmd, sub, ...rest] = positional;
@@ -232,6 +235,8 @@ function isNearScheduled(ctx: RuntimeContext): boolean {
 function printSummary(s: Awaited<ReturnType<typeof runBackupAgent>>) {
   console.log(`\n작업 ${s.job_id.slice(0, 8)}: ${s.status}${s.message ? ` — ${s.message}` : ''}`);
   console.log(`  대상 ${s.repository_count} / 새 스냅샷 ${s.success_count} / 변경 없음 ${s.unchanged_count} / 실패 ${s.failed_count} / 업로드 대기 ${s.pending_count}`);
+  // 공개 저장소의 Actions 로그 등에서는 private 저장소 이름을 출력하지 않는다 (상세는 Drive logs/ 에 보관)
+  if (process.env.REPOVAULT_PUBLIC_LOG === '1') return;
   for (const r of s.results) {
     if (r.outcome !== 'unchanged') console.log(`  - ${r.repository_id}: ${r.outcome}${r.message ? ` (${r.message.slice(0, 200)})` : ''}`);
   }

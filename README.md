@@ -6,6 +6,7 @@ GitHub(공개 + **private**) 및 일반 Git 원격 저장소를 **매일 자동�
 - 영구 백업 위치는 **Google Drive 하나뿐** (로컬은 작업 중 임시 공간만 사용, 업로드·검증 후 자동 삭제)
 - **GitHub에서 저장소/브랜치/태그를 삭제하거나 강제 푸시해도 Drive에는 과거 상태가 남습니다**
 - GUI를 꺼도 OS 스케줄러(macOS LaunchAgent / Windows 작업 스케줄러)가 매일 백업
+- **PC가 꺼져 있어도 GitHub Actions(클라우드 러너)가 매일 백업** — [docs/CLOUD_RUNNER.md](docs/CLOUD_RUNNER.md)
 - Google OAuth Desktop + PKCE(S256), 최소 권한 `drive.file`, 토큰은 Keychain/Credential Manager에만 저장
 
 ```text
@@ -46,6 +47,7 @@ Google Cloud Console 설정은 [docs/GOOGLE_DRIVE_SETUP.md](docs/GOOGLE_DRIVE_SE
 
 ## 문서
 - [아키텍처](docs/ARCHITECTURE.md) · [Cloud-Only 정책 / Drive 구조](docs/CLOUD_ONLY_BACKUP.md)
+- [PC가 꺼져 있어도 백업 (클라우드 러너)](docs/CLOUD_RUNNER.md)
 - [Google Cloud Console 설정](docs/GOOGLE_DRIVE_SETUP.md) · [설치/사용/마이그레이션](docs/INSTALL_GUIDE.md)
 - [복원 가이드](docs/RESTORE_GUIDE.md) · [문제 해결](docs/TROUBLESHOOTING.md)
 
