@@ -61,6 +61,30 @@ if (args.includes('--backup-token-stdin')) {
   console.log('  더 안전하게: Contents=Read-only, 모든 저장소 대상 fine-grained 토큰을 만들어 --backup-token-stdin 으로 전달하세요.');
 }
 
+// 등록 전에 백업용 토큰 검증: 유효성(401) + 코드 읽기(Contents) 권한
+{
+  const { GitHubAdapter } = await core('providers/github.js');
+  const gh = new GitHubAdapter(backupToken);
+  let login;
+  try {
+    login = (await gh.currentUser()).login;
+  } catch {
+    console.error('✖ 백업용 GitHub 토큰이 유효하지 않습니다(401). 클립보드에 토큰이 정확히 복사됐는지, 만료되지 않았는지 확인하세요. 아무것도 등록하지 않았습니다.');
+    process.exit(1);
+  }
+  const repos = await gh.listRepositories({ includeOrgs: [], includeCollaborator: false, includeArchived: true, includeForks: true });
+  const probe = repos.find((r) => r.private) ?? repos[0];
+  if (!probe) {
+    console.error('✖ 토큰으로 접근 가능한 저장소가 없습니다. Repository access를 "All repositories"로 설정하세요.');
+    process.exit(1);
+  }
+  if (!(await gh.checkContentsAccess(probe.owner, probe.name))) {
+    console.error('✖ 토큰에 코드 읽기 권한이 없습니다. Repository permissions → Contents: Read-only 를 추가하세요. 아무것도 등록하지 않았습니다.');
+    process.exit(1);
+  }
+  console.log(`✔ 백업용 토큰 확인: ${login}, 접근 가능 저장소 ${repos.length}개 (private ${repos.filter((r) => r.private).length}개), 코드 읽기 권한 OK`);
+}
+
 const api = async (method, path, body) => {
   const res = await fetch(`https://api.github.com/repos/${repo}${path}`, {
     method,
